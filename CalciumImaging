@@ -147,10 +147,6 @@ any(isnan(cleanData{:, 2:end}));
 validRows = ~any(isnan(cleanData{:, 2:end}), 2) & ~isnan(cleanData.Group);
 cleanData = cleanData(validRows, :);
 
-% Only for now
-newData= cleanData +1;
-cleanData = [newData; cleanData];
-
 % Testing
 Group=cleanData.Group;
 columns= cleanData.Properties.VariableNames;
