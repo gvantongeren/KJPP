@@ -1,15 +1,39 @@
 %% Calcium Imaging Analysis
 % Preparation of data using FluoroSNNAP (tapan-patel)
 % input: txt files of FluoroSNNAP
-% Last updated: 10'03'2025
+% Last updated: 24'03'2025
 % By Geke van Tongeren
 
+% Output:
+% Separate excel files with the data for every cell line
+% Combined excel file for all cell lines
+% Significance over all ROIs with figures
+% Significance over cell lines (averaged ROIs) with figures
+
+
 % %% Load the files
-instructionMessage = 'Please select the folder where the txt files can be found';
-myDirT = uigetdir('', instructionMessage); % Get directory where the txt files are
-myFilesT = dir(fullfile(myDirT,'*.txt')); % Get all txt files in directory
+instructionMessage1 = 'Please select the folder where the txt summary files can be found that came out of the FluoroSNNAP';
+myDir1 = uigetdir('', instructionMessage1); %Get directory where the txt files are
+
+instructionMessage2 = 'Please select the output folder where you want to store the separate excel files of each cell line';
+outputfolder = uigetdir('', instructionMessage2); %Change to desired folder
+
+instructionMessage3 = 'Please select the folder where the separate excel files of each cell line can be found';
+myDir2 = outputfolder %uigetdir('', instructionMessage3); %Get directory where the txt files are
+
+instructionMessage4 = 'Please select the output folder where you want to store the allCellLines excel sheet';
+outputfolder2 = uigetdir('', instructionMessage4); %Change to desired folder
+
+% instructionMessage5 = 'Please select the folder where the AllCellLines excel files is located';
+myDir3 = outputfolder2  %uigetdir('', instructionMessage5); %Get directory where the txt files are
+
+% instructionMessage6 = 'Please select the folder where the separate excel files are located';
+myDir4 = outputfolder %uigetdir('', instructionMessage6); %Get directory where the txt files are
+
 
 %% Make excel file from the txt files
+myFilesT = dir(fullfile(myDir1,'*.txt')); %Get all txt files in directory
+
 % loop for every file of txt
 for e = 1: length(myFilesT)
     efile2be = myFilesT(e).name;
@@ -55,7 +79,7 @@ for e = 1: length(myFilesT)
 
         % Ensure headers contain exactly 12 values
         headers = splitData{1};
-        if numel(headers) != 12
+        if numel(headers) ~= 12
             error('The number of headers is not equal to 12.');
         end
 
@@ -73,16 +97,16 @@ for e = 1: length(myFilesT)
         columnNames = T.Properties.VariableNames;
         for d=1:length(columnNames)
             Name=T.Properties.VariableNames{d};
-            T.(Name) = str2double(T.(Name));
+            T.(Name);
+            double = str2double(T.(Name));
+            T.(Name) = double;
         end
 
-        % Save to excel sheet
-        filenameParts = split (efile2be, '_');
-        outputfilename = sprintf('summary_%s.xlsx',  filenameParts{1});
+        %Save to excel sheet
+        filenameParts = split (efile2be, '-');
+        outputfilename = sprintf('summary_%s.xlsx', filenameParts{1},filenameParts{2});
 
         % Save to excel sheet with name of the file
-        instructionMessage2 = 'Please select the output folder where you want to store the Overview excel files';
-        outputfolder = myDirT %uigetdir('', instructionMessage2); % Change to desired folder
         outputfilename = fullfile(outputfolder, outputfilename);
         writetable(T, outputfilename);
     end
@@ -90,22 +114,19 @@ end
 
 %% Make one big overview excel file
 % This way it is easier to put into graphpad
-
-instructionMessage3 = 'Please select the folder where the excel files can be found';
-myDir = myDirT %uigetdir('', instructionMessage3); % Get directory where the txt files are
-myFiles = dir(fullfile(myDir,'*.xlsx'));
+myFiles = dir(fullfile(myDir2,'*.xlsx'));
 
 % Taking the different ROIs in every cell line as different trials
 combinedData= table();
 % Loop over each file and read the data
 for i = 1:length(myFiles)
-    % Add column for the different groups
+    %Add column for the different groups
     if contains(myFiles(i).name, 'summary')
         if contains(myFiles(i).name, 'KO')
             FileName= myFiles(i).name;
             currenttable = readtable(FileName);
             currenttable.Group = repmat({'KO'}, height(currenttable), 1); % {'KO'}
-        elseif contains(myFiles(i).name, 'MR')
+        elseif contains(myFiles(i).name, 'MR');
             FileName= myFiles(i).name;
             currenttable = readtable(FileName);
             currenttable.Group = repmat({'MR'}, height(currenttable), 1);
@@ -118,13 +139,14 @@ for i = 1:length(myFiles)
         currenttable.CellLine = repmat({celline}, height(currenttable), 1);
 
         % Combine the files
-        filePath = fullfile(myDir, myFiles(i).name);
+        filePath = fullfile(myDir1, myFiles(i).name);
         data = currenttable;
         combinedData = [combinedData; currenttable];
 
+        % Tweaks
+        %combinedData.x_ISI__s_ = str2double(combinedData.x_ISI__s_);
+
         % Save excel file
-        instructionMessage4 = 'Please select the output folder where you want to store the combined table';
-        outputfolder2 = myDirT %uigetdir('', instructionMessage4); % Change to desired folder
         combinedName = 'AllCellLines.xlsx';
         combinedName = fullfile(outputfolder2, combinedName);
         writetable(combinedData, combinedName);
@@ -133,8 +155,10 @@ for i = 1:length(myFiles)
     end
 end
 
-%% Significance
-% Use combinedData made above
+%% % Significance
+
+% Calculations 
+
 cleanData = combinedData;
 cleanData.Group(strcmp(cleanData.Group, 'KO')) = {'0'};
 cleanData.Group(strcmp(cleanData.Group, 'MR')) = {'1'};
@@ -147,13 +171,13 @@ any(isnan(cleanData{:, 2:end}));
 validRows = ~any(isnan(cleanData{:, 2:end}), 2) & ~isnan(cleanData.Group);
 cleanData = cleanData(validRows, :);
 
-% Testing
+%Testing
 Group=cleanData.Group;
 columns= cleanData.Properties.VariableNames;
 columns = columns(~strcmp(columns, 'Group') & ~strcmp(columns, 'x_Assemblies') & ~strcmp(columns, 'ClusteringCoef'));
 
 % Make txt file
-filename = 'Significance.txt';
+filename = fullfile(myDir3,'Significance.txt');
 fileID = fopen(filename, 'w');
 if fileID == -1
     error('Failed to open the file for writing.');
@@ -169,7 +193,8 @@ for i = 1:length(columns)
         p = ranksum(cleanData{cleanData.Group == 0, columns{i}}, cleanData{cleanData.Group == 1, columns{i}});
         fprintf(fileID,'Mann-Whitney U Test for %s: p = %.4f\n', columns{i}, p);
         fprintf (fileID,'\n\n');
-    elseif p > 0.05 % If normal distributed
+
+    elseif p>0.05 % If normal distributed
         fprintf(fileID,' -> No significant difference in %s between groups (fail to reject H0)\n', columns{i});
         % Individual t tests
         [h, p] = ttest2(cleanData{Group==0, columns{i}}, cleanData{Group==1, columns{i}});
@@ -187,23 +212,27 @@ m=0;
 Overview = [];
 uniqueGroups = unique(combinedData.Group);
 
-for g = 1:length(uniqueGroups)
-    groupName = uniqueGroups{g}; % with GroupNames use {}
+for g = 1:length(uniqueGroups);
+    groupName = uniqueGroups{g}; %  with GroupNames use {}
     groupData = combinedData(strcmp(combinedData.Group, groupName),:);
-    for m=1:(length(column_m))
+    for m=1:(length(column_m));
         m=m+1;
         if m>2 && m<12
             columntoav = column_m{m};
             meanValue = nanmean(groupData{:,columntoav});
             meanName = sprintf('Mean_%s', columntoav);
-            Overview.(meanName) = meanValue; % && Save it for every variable
+            Overview.(meanName) = meanValue; %&& Save it for every variable
         end
     end
+    % % Rename for the Groups for workspace
+    % newFileName = sprintf('Overview_%s', groupName);
+    % eval([newFileName '=Overview;']);
+
     % Save the files as txt files in a folder based on groupName
     % These txt files can be used for a quick overview to see if there
     % would be a difference.
     groupName = sprintf('Overview_%s', groupName);
-    newFileName = fullfile(myDir, groupName);
+    newFileName = fullfile(myDir1, groupName);
     fileID = fopen(newFileName, 'w');
     fields = fieldnames(Overview);
     for t=1:length(fields)
@@ -213,12 +242,8 @@ for g = 1:length(uniqueGroups)
     fclose(fileID)
 end
 
-%% Figures of averages
-% This way it is easier to put into graphpad
-
-instructionMessage5 = 'Please select the folder where the AllCellLines excel files is located';
-myDir = myDirT %uigetdir('', instructionMessage5); % Get directory where the txt files are
-myFiles = dir(fullfile(myDir,'*.xlsx'));
+%% Figures
+myFiles = dir(fullfile(myDir3,'*.xlsx'));
 
 for fa=1:length(myFiles)
     if contains(myFiles(fa).name, 'AllCellLines')
@@ -249,13 +274,153 @@ for fa=1:length(myFiles)
             co=co+1;
 
             % Save figures dependent on the column name
-            figureName = [column, '.fig'];
-            figureName = [figureName{1}, figureName{2}];
+            name = [column, '.fig']
+            name = [name{1}, name{2}]
+            figureName = fullfile(myDir3, name);
             saveas(gcf, figureName);
         end
     end
 end
 
-% Empty workspace, everything you need is saved to PC
-close all
-clear all
+%% Averaged per celline
+myFiles = dir(fullfile(myDir4,'*.xlsx'))
+
+allAvg = [];
+
+for av = 1: length(myFiles)
+    if contains(myFiles(av).name, 'summary_')
+        % Load excel file as table
+        FileName = myFiles(av).name;
+        currenttable = readtable(FileName);
+
+        % For all columns calculate average
+        averages = varfun(@(x) mean(x, 'omitnan'), currenttable, 'OutputFormat', 'table');
+
+        % Add Group
+        averages.Group=zeros(1,1);
+        averages.Fun_NeuronID=[];
+        if contains(myFiles(av).name,'KO')
+            averages.Group='KO';
+        elseif contains(myFiles(av).name, 'MR')
+            averages.Group='MR';
+        end
+
+        % Add column cell line
+        celline = extractBefore(FileName, '.xlsx');
+        celline = extractAfter(celline, 'summary_');
+        celline_parts = split(celline, '_');
+        celline = [celline_parts{1}, celline_parts{2}, celline_parts{3}];
+        averages.CellLine = repmat({celline}, height(averages), 1);
+        averages.CellLine = char(averages.CellLine);
+
+        % Put all together in one table
+        averages.CellLine = string(averages.CellLine);
+
+        % Add day
+        if contains(myFiles(av).name, 'd31')
+            averages.Day = repmat({day}, height(averages), 1)
+        end
+
+        % Now concatenate the tables
+        allAvg = vertcat(allAvg, averages);
+
+    end
+end
+
+% Calculate significance
+% Use combinedData made above
+allAvgS = allAvg;
+allAvgS.Group = cellstr(allAvgS.Group); % Convert to cell array
+allAvgS.Group(strcmp(allAvgS.Group, 'KO')) = {0};;
+allAvgS.Group(strcmp(allAvgS.Group, 'MR')) = {1};
+allAvgS.Group = cell2mat(allAvgS.Group);
+
+% % Remove NaN
+% any(isnan(allAvgS{:, 1:end-2}));
+% validRows = ~any(isnan(allAvgS{:, 2:end}), 2) & ~isnan(allAvgS.Group);
+% allAvgS = allAvgS(validRows, :);
+
+%Testing
+Group=allAvgS.Group;
+columns= allAvgS.Properties.VariableNames;
+columns = columns(~strcmp(columns, 'Group') & ~strcmp(columns, 'x_Assemblies') & ~strcmp(columns, 'ClusteringCoef'));
+
+% Make txt file
+myDir5 = 'Y:\Geke van Tongeren\Experiments\Calcium imaging\03 Analysis\2025-03-21\all_Averaged'
+filename = fullfile(myDir5, 'Significance_Averaged.txt');
+fileID = fopen(filename, 'w');
+if fileID == -1
+    error('Failed to open the file for writing.');
+end
+
+% Testing
+for i = 1:(length(columns)-1)
+    [h, p] = kstest(allAvgS{:, columns{i}});
+    fprintf('Shapiro-Wilk Test for %s: p = %.4f and h:%.4f\n', columns{i}, p, h);
+    if p < 0.05
+        fprintf(fileID,' -> %s is NOT normally distributed (reject H0)\n', columns{i});
+        % Not normally distributed
+        p = ranksum(allAvgS{allAvgS.Group == 0, columns{i}}, allAvgS{allAvgS.Group == 1, columns{i}});
+        fprintf(fileID,'Mann-Whitney U Test for %s: p = %.4f\n', columns{i}, p);
+        fprintf (fileID,'\n\n');
+
+    elseif p>0.05 % If normal distributed
+        fprintf(fileID,' -> No significant difference in %s between groups (fail to reject H0)\n', columns{i});
+        % Individual t tests
+        [h, p] = ttest2(allAvgS{Group==0, columns{i}}, allAvgS{Group==1, columns{i}});
+        fprintf(fileID,'T test is calculated of Variable: %s, p-value: %.4f and h:%.4f\n', columns{i}, p, h);
+        fprintf (fileID,'\n\n');
+    end
+end;
+
+fclose(fileID);
+
+%% Make figures
+% allAvg
+
+% Make a figure
+% For every column
+columnNames = allAvg.Properties.VariableNames;
+coA=0;
+for coA=1:(length(columnNames)-2)
+    column = columnNames(coA);
+    column = char(column);
+
+    % Make figures
+    allAvg.Group = categorical(cellstr(allAvg.Group));
+
+    % Compute means for each group
+    groups = categories(allAvg.Group); % Get unique group labels
+    meanValues = splitapply(@mean, allAvg.(column), findgroups(allAvg.Group));
+
+    % Create figure
+    figure;
+    hold on;
+
+    % Plot bar chart
+    bar(categorical(groups), meanValues, 'FaceColor', [0.7 0.7 0.7]); % Grey bars
+
+    % Scatter plot overlay (individual points)
+    gscatter(allAvg.Group, allAvg.(column), allAvg.Group, 'rb', 'o', 8, 'filled');
+
+    % Labels & title
+    xlabel('Group');
+    ylabel(column);
+    title([column ' by Group']);
+    grid on;
+    hold off;
+
+    % Save figures dependent on the column name
+    myDir7 = 'Y:\Geke van Tongeren\Experiments\Calcium imaging\03 Analysis\2025-03-21\all_Averaged';
+    figureName = fullfile(myDir7, [column, '.fig']);
+    saveas(gcf, figureName);
+end
+
+% Save the table as an excel file
+if contains(myFiles(av).name, 'd41')
+    filename = fullfile (myDir7, 'allAvg_d41.xlsx');
+else
+    filename = fullfile (myDir7, 'allAvg_d31.xlsx');
+end
+
+writetable(allAvg, filename);
