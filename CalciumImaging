@@ -1,7 +1,7 @@
 %% Calcium Imaging Analysis
 % Preparation of data using FluoroSNNAP (tapan-patel)
 % input: txt files of FluoroSNNAP
-% Last updated: 24'03'2025
+% Last updated: 03'04'2025
 % By Geke van Tongeren
 
 % Output:
@@ -16,20 +16,22 @@ instructionMessage1 = 'Please select the folder where the txt summary files can 
 myDir1 = uigetdir('', instructionMessage1); %Get directory where the txt files are
 
 instructionMessage2 = 'Please select the output folder where you want to store the separate excel files of each cell line';
-outputfolder = uigetdir('', instructionMessage2); %Change to desired folder
+outputfolder = myDir1 ; %uigetdir('', instructionMessage2); %Change to desired folder;
 
 instructionMessage3 = 'Please select the folder where the separate excel files of each cell line can be found';
-myDir2 = outputfolder %uigetdir('', instructionMessage3); %Get directory where the txt files are
+myDir2 = outputfolder; %uigetdir('', instructionMessage3); %Get directory where the txt files are
 
 instructionMessage4 = 'Please select the output folder where you want to store the allCellLines excel sheet';
 outputfolder2 = uigetdir('', instructionMessage4); %Change to desired folder
 
 % instructionMessage5 = 'Please select the folder where the AllCellLines excel files is located';
-myDir3 = outputfolder2  %uigetdir('', instructionMessage5); %Get directory where the txt files are
+myDir3 = outputfolder2;  %uigetdir('', instructionMessage5); %Get directory where the txt files are
 
 % instructionMessage6 = 'Please select the folder where the separate excel files are located';
-myDir4 = outputfolder %uigetdir('', instructionMessage6); %Get directory where the txt files are
+myDir4 = outputfolder; %uigetdir('', instructionMessage6); %Get directory where the txt files are
 
+instructionMessage7 = 'Please select the folder in which the averaged files need to be stored';
+myDir5 = uigetdir('', instructionMessage7);
 
 %% Make excel file from the txt files
 myFilesT = dir(fullfile(myDir1,'*.txt')); %Get all txt files in directory
@@ -191,7 +193,7 @@ for i = 1:length(columns)
         fprintf(fileID,' -> %s is NOT normally distributed (reject H0)\n', columns{i});
         % Not normally distributed
         p = ranksum(cleanData{cleanData.Group == 0, columns{i}}, cleanData{cleanData.Group == 1, columns{i}});
-        fprintf(fileID,'Mann-Whitney U Test for %s: p = %.4f\n', columns{i}, p);
+        fprintf(fileID,'Mann-Whitnoney U Test for %s: p = %.4f\n', columns{i}, p);
         fprintf (fileID,'\n\n');
 
     elseif p>0.05 % If normal distributed
@@ -274,8 +276,8 @@ for fa=1:length(myFiles)
             co=co+1;
 
             % Save figures dependent on the column name
-            name = [column, '.fig']
-            name = [name{1}, name{2}]
+            name = [column, '.fig'];
+            name = [name{1}, name{2}];
             figureName = fullfile(myDir3, name);
             saveas(gcf, figureName);
         end
@@ -283,7 +285,7 @@ for fa=1:length(myFiles)
 end
 
 %% Averaged per celline
-myFiles = dir(fullfile(myDir4,'*.xlsx'))
+myFiles = dir(fullfile(myDir4,'*.xlsx'));
 
 allAvg = [];
 
@@ -309,7 +311,7 @@ for av = 1: length(myFiles)
         celline = extractBefore(FileName, '.xlsx');
         celline = extractAfter(celline, 'summary_');
         celline_parts = split(celline, '_');
-        celline = [celline_parts{1}, celline_parts{2}, celline_parts{3}];
+        celline = [celline_parts{2}, celline_parts{3}];
         averages.CellLine = repmat({celline}, height(averages), 1);
         averages.CellLine = char(averages.CellLine);
 
@@ -318,21 +320,42 @@ for av = 1: length(myFiles)
 
         % Add day
         if contains(myFiles(av).name, 'd31')
-            averages.Day = repmat({day}, height(averages), 1)
+            day = 'd31';
+            averages.Day = repmat({day}, height(averages), 1);
+        elseif contains(myFiles(av).name, 'd41')
+            day = 'd41';
+            averages.Day = repmat({day}, height(averages), 1);
         end
 
         % Now concatenate the tables
         allAvg = vertcat(allAvg, averages);
-
     end
 end
+
+% Calculate per cell line
+allAvg_cellLine = varfun(@mean, allAvg, "GroupingVariables", "CellLine", "InputVariables", ...
+    setdiff(allAvg.Properties.VariableNames, ["Group", "CellLine", "Day"]));
+
+% Restore the "Group" column by taking the first occurrence for each CellLine
+[~, idx] = unique(allAvg.CellLine); % Find first occurrence indices
+allAvg_cellLine.Group = allAvg.Group(idx); % Assign the correct Group
+allAvg = allAvg_cellLine;
+
+% Save the table as an excel file
+if contains(myFiles(av).name, 'd41')
+    filename = fullfile (myDir5, 'allAvg_d41.xlsx');
+else
+    filename = fullfile (myDir5, 'allAvg_d31.xlsx');
+end
+
+writetable(allAvg, filename);
 
 % Calculate significance
 % Use combinedData made above
 allAvgS = allAvg;
 allAvgS.Group = cellstr(allAvgS.Group); % Convert to cell array
-allAvgS.Group(strcmp(allAvgS.Group, 'KO')) = {0};;
-allAvgS.Group(strcmp(allAvgS.Group, 'MR')) = {1};
+allAvgS.Group(strcmp(allAvgS.Group, 'K')) = {0};
+allAvgS.Group(strcmp(allAvgS.Group, 'M')) = {1};
 allAvgS.Group = cell2mat(allAvgS.Group);
 
 % % Remove NaN
@@ -343,10 +366,9 @@ allAvgS.Group = cell2mat(allAvgS.Group);
 %Testing
 Group=allAvgS.Group;
 columns= allAvgS.Properties.VariableNames;
-columns = columns(~strcmp(columns, 'Group') & ~strcmp(columns, 'x_Assemblies') & ~strcmp(columns, 'ClusteringCoef'));
+columns = columns(~strcmp(columns, 'Group') & ~strcmp(columns, 'x_Assemblies') & ~strcmp(columns, 'ClusteringCoef') & ~strcmp(columns, 'CellLine')& ~strcmp(columns, 'GroupCount'));
 
 % Make txt file
-myDir5 = 'Y:\Geke van Tongeren\Experiments\Calcium imaging\03 Analysis\2025-03-21\all_Averaged'
 filename = fullfile(myDir5, 'Significance_Averaged.txt');
 fileID = fopen(filename, 'w');
 if fileID == -1
@@ -365,7 +387,7 @@ for i = 1:(length(columns)-1)
         fprintf (fileID,'\n\n');
 
     elseif p>0.05 % If normal distributed
-        fprintf(fileID,' -> No significant difference in %s between groups (fail to reject H0)\n', columns{i});
+        fprintf(fileID,' -> Normally distrubuted, no significant difference in %s between groups (fail to reject H0)\n', columns{i});
         % Individual t tests
         [h, p] = ttest2(allAvgS{Group==0, columns{i}}, allAvgS{Group==1, columns{i}});
         fprintf(fileID,'T test is calculated of Variable: %s, p-value: %.4f and h:%.4f\n', columns{i}, p, h);
@@ -380,47 +402,79 @@ fclose(fileID);
 
 % Make a figure
 % For every column
+allAvg = allAvg_cellLine;
 columnNames = allAvg.Properties.VariableNames;
-coA=0;
-for coA=1:(length(columnNames)-2)
-    column = columnNames(coA);
-    column = char(column);
+for coA = 3:(length(columnNames)-1)
+    column = columnNames{coA}; % Get column name as string
 
-    % Make figures
-    allAvg.Group = categorical(cellstr(allAvg.Group));
+    % Check the type of allAvg.Group and handle accordingly
+    if isstring(allAvg.Group)
+        % If it's a string array, use strrep directly on the whole array
+        allAvg.Group = strrep(allAvg.Group, 'K', 'Control');
+        allAvg.Group = strrep(allAvg.Group, 'M', 'ADHD');
+    elseif iscell(allAvg.Group)
+        % If it's a cell array, apply strrep to each element using cellfun
+        allAvg.Group = cellfun(@(x) strrep(x, 'K', 'Control'), allAvg.Group, 'UniformOutput', false);
+        allAvg.Group = cellfun(@(x) strrep(x, 'M', 'ADHD'), allAvg.Group, 'UniformOutput', false);
+    elseif ischar(allAvg.Group)
+        % If it's a character array, you need to convert it to a string array first
+        allAvg.Group = string(allAvg.Group);
+        allAvg.Group = strrep(allAvg.Group, 'K', 'Control');
+        allAvg.Group = strrep(allAvg.Group, 'M', 'ADHD');
+    end
+
+    % Convert 'Group' to categorical with custom order ('Control' on left, 'ADHD' on right)
+    allAvg.Group = categorical(allAvg.Group, {'Control', 'ADHD'});
 
     % Compute means for each group
-    groups = categories(allAvg.Group); % Get unique group labels
+    groups = categories(allAvg.Group); % Unique group labels
     meanValues = splitapply(@mean, allAvg.(column), findgroups(allAvg.Group));
+
+    % Define colors (blue & orange)
+    groupColors = [0 0 1; 1 0.5 0]; % One color per group
 
     % Create figure
     figure;
     hold on;
 
-    % Plot bar chart
-    bar(categorical(groups), meanValues, 'FaceColor', [0.7 0.7 0.7]); % Grey bars
+    % Plot bar chart (slightly transparent)
+    b = bar(groups, meanValues, 'FaceColor', 'flat');
+    b.CData = groupColors; % Assign colors to bars
+    b.FaceAlpha = 0.6; % Make bars slightly transparent
 
-    % Scatter plot overlay (individual points)
-    gscatter(allAvg.Group, allAvg.(column), allAvg.Group, 'rb', 'o', 8, 'filled');
+    % Assign colors to scatter points based on their group
+    [~, groupIdx] = ismember(allAvg.Group, groups); % Map groups to indices
+    scatterColors = groupColors(groupIdx, :); % Assign colors accordingly
+
+    % Scatter plot overlay (solid blue & orange, black edges)
+    scatter(allAvg.Group, allAvg.(column), 80, ...
+        scatterColors, 'filled', 'MarkerEdgeColor', 'k');
 
     % Labels & title
+    columnname = strsplit(column, '_');
+    for cn=1:length(columnname)
+        contains(columnname(1), 'mean') && contains(columnname(2), 'Fun') && contains(columnname(3), 'x');
+        if ans == 1
+            number = 4
+        else 
+            number = 3
+        end
+    end
+
+    columnname = columnname{number};
     xlabel('Group');
-    ylabel(column);
-    title([column ' by Group']);
+    ylabel(['Mean ', columnname]);
+    title(['Mean ', columnname, ' by Group']);
     grid on;
     hold off;
 
-    % Save figures dependent on the column name
-    myDir7 = 'Y:\Geke van Tongeren\Experiments\Calcium imaging\03 Analysis\2025-03-21\all_Averaged';
-    figureName = fullfile(myDir7, [column, '.fig']);
+    % Save figure
+    figureName = fullfile(myDir5, [column, '.fig']);
     saveas(gcf, figureName);
 end
 
-% Save the table as an excel file
-if contains(myFiles(av).name, 'd41')
-    filename = fullfile (myDir7, 'allAvg_d41.xlsx');
-else
-    filename = fullfile (myDir7, 'allAvg_d31.xlsx');
-end
 
-writetable(allAvg, filename);
+
+% End
+close all
+% clear all
